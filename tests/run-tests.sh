@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Regression suite for the A390049 sieve. Every case here is a defect that was
-# live at commit a486447; see REVIEW.md for what each one was. Run via
-# `make test`, or directly. Documented in AITESTING.md.
+# live at some point in this code. Run via `make test`, or directly.
+# Documented in AITESTING.md.
 set -u
 cd "$(dirname "$0")/.."
 
@@ -64,6 +64,30 @@ head -c 20 "$TMP/b.state" > "$TMP/trunc.state"
 eq "truncated state refused"  "3" "$(rc_of ./sieve 0 3000000 "$T" 1048576 "$TMP/trunc.state" 8192)"
 head -c 200 /dev/urandom > "$TMP/junk.state"
 eq "foreign state refused"    "3" "$(rc_of ./sieve 0 3000000 "$T" 1048576 "$TMP/junk.state" 8192)"
+
+echo "== checkpoint cadence =="
+
+# The cadence is a time budget, not a window count: the bitmap grows with the
+# range, and fsyncing a big one every 256 windows cost 2.7x on the a(11) sweep.
+# SIEVE_CHECKPOINT_SECS=0 forces the periodic path on every window so it is
+# actually exercised -- the other resume tests finish inside one interval and
+# only ever hit the final save.
+rm -f "$TMP/c.state"*
+( SIEVE_CHECKPOINT_SECS=0 SIEVE_PROGRESS_SECS=0 \
+  timeout 20 ./sieve 0 400000000 "$T" 1048576 "$TMP/c.state" 8192 >/dev/null 2>&1 )
+eq "periodic checkpoint is written"  "0" "$(rc_of ./tools/state-status.py "$TMP/c.state")"
+
+# kill mid-run, then confirm what survived is resumable and consistent
+rm -f "$TMP/k.state"*
+( SIEVE_CHECKPOINT_SECS=0 timeout 3 ./sieve 0 20000000000 "$T" 1048576 "$TMP/k.state" 8192 >/dev/null 2>&1 )
+KRC=$(rc_of ./tools/state-status.py "$TMP/k.state")
+if [ "$KRC" = "1" ]; then ok "killed run leaves an incomplete but valid checkpoint"
+else bad "killed run leaves an incomplete but valid checkpoint" "status-status rc=$KRC"; fi
+eq "killed run resumes"  "0" "$(rc_of ./sieve 0 20000000000 "$T" 1048576 "$TMP/k.state" 8192)"
+eq "  ...and is complete after resuming" "0" "$(rc_of ./tools/state-status.py "$TMP/k.state")"
+
+eq "bad SIEVE_CHECKPOINT_SECS falls back with a warning" "1" \
+   "$(SIEVE_CHECKPOINT_SECS=banana ./sieve 2 100000 "$T" 1048576 "" 8192 2>&1 >/dev/null | grep -c 'ignoring SIEVE_CHECKPOINT_SECS')"
 
 echo "== C3/C4/C5 argument validation =="
 eq "hi <= lo rejected"        "2" "$(rc_of ./sieve 1000 500 "$T" 1048576 "" 8192)"

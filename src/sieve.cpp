@@ -53,7 +53,18 @@
 //   g++ -O3 -march=native -fopenmp -o sieve src/sieve.cpp
 //   ./sieve <lo> <hi> [threads] [window] [statefile] [block]
 //
+// v6: checkpoint and progress cadence are on a TIME budget, not a window count.
+// The bitmap grows with the range -- 1.9 MB for the a(10) sweep but 31.5 MB for
+// a(11) -- and a fixed 256-window cadence writes and fsyncs the whole thing
+// inside the critical section, which at full speed is every 0.1 s. Measured on
+// the a(11) range: 2686.6 M n/s with no state file against 995.1 M n/s with
+// one, a 2.7x loss that grows with the range. A time budget bounds both the
+// I/O and the work a crash discards, independent of how big the range is.
+//
 // exit 0 done, 2 bad arguments, 3 unusable state file, 4 checkpoint write failed
+//
+// env: SIEVE_CHECKPOINT_SECS (default 60) seconds between checkpoints
+//      SIEVE_PROGRESS_SECS   (default 5)  seconds between progress lines
 
 #include <cstdio>
 #include <cstdlib>
@@ -178,6 +189,22 @@ static bool save_state(const std::string& state, const StateHdr& h,
     return rename(tmp.c_str(), state.c_str()) == 0;
 }
 
+// Seconds between checkpoints / progress lines. A checkpoint costs one write of
+// the whole bitmap under the critical section, so the interval has to be set by
+// time rather than by a window count that means different things at different
+// range sizes. The cost of a crash is bounded by the same number.
+static double env_secs(const char* name, double dflt) {
+    const char* v = getenv(name);
+    if (!v || !*v) return dflt;
+    char* end = nullptr;
+    const double d = strtod(v, &end);
+    if (end == v || *end || !(d >= 0.0) || d > 86400.0) {
+        fprintf(stderr, "warning: ignoring %s=%s, using %.0f\n", name, v, dflt);
+        return dflt;
+    }
+    return d;
+}
+
 int main(int argc, char** argv) {
     if (argc < 3) { fprintf(stderr, "usage: sieve <lo> <hi> [threads] [window] [state] [block]\n"); return 2; }
     const uint64_t lo0 = strtoull(argv[1], nullptr, 10);
@@ -294,8 +321,12 @@ int main(int argc, char** argv) {
             (unsigned long long)root, primes.size(), nsmall, primes.size()-nsmall,
             (unsigned long long)already,(unsigned long long)nwin);
 
+    const double ckpt_secs = env_secs("SIEVE_CHECKPOINT_SECS", 60.0);
+    const double prog_secs  = env_secs("SIEVE_PROGRESS_SECS",    5.0);
+
     double t0 = omp_get_wtime();
     uint64_t done = 0;
+    double last_ckpt = t0, last_prog = t0;   // shared, only touched under critical
 
     #pragma omp parallel num_threads(threads)
     {
@@ -396,10 +427,15 @@ int main(int argc, char** argv) {
                 done++;
                 #pragma omp atomic update
                 doneBits[w >> 3] |= (uint8_t)(1u << (w & 7));   // this window, specifically
-                if (!state.empty() && (done & 0xff) == 0 && !save_state(state, hdr, doneBits))
-                    fprintf(stderr, "\nwarning: could not write checkpoint %s\n", state.c_str());
-                if ((done & 0x3f) == 0) {
-                    double el = omp_get_wtime() - t0;
+                const double now = omp_get_wtime();
+                if (!state.empty() && now - last_ckpt >= ckpt_secs) {
+                    if (!save_state(state, hdr, doneBits))
+                        fprintf(stderr, "\nwarning: could not write checkpoint %s\n", state.c_str());
+                    last_ckpt = omp_get_wtime();       // measure from completion
+                }
+                if (now - last_prog >= prog_secs) {
+                    last_prog = now;
+                    const double el = now - t0;
                     fprintf(stderr, "\r%llu/%llu  %.1f M n/s  eta %.2f h    ",
                             (unsigned long long)(already+done),(unsigned long long)nwin,
                             done*(double)W/el/1e6,

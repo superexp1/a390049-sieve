@@ -1,6 +1,6 @@
 # a390049-sieve
 
-Superexponential AI Labs
+Superexponential AI Labs, 
 Mike Krygier
 
 A segmented sieve that computes sigma, psi, phi and omega simultaneously at
@@ -108,6 +108,20 @@ silently drop it.
 **per-window bitmap, not a count** — with `schedule(dynamic)` windows finish out
 of order, so a count is not a low-water mark and resuming at one would silently
 skip unprocessed windows.
+
+The bitmap is written on a **time budget**, not every N windows. It grows with
+the range — 1.9 MB for the a(10) sweep, 31.5 MB for a(11) — and is fsync'd
+inside the critical section, so a fixed window cadence means very different
+things at different sizes. On the a(11) range it cost 2.7x: 2686.6 M n/s with
+no state file against 995.1 M n/s with one.
+
+| variable | default | what it bounds |
+|---|---|---|
+| `SIEVE_CHECKPOINT_SECS` | 60 | checkpoint I/O, and the work a crash discards |
+| `SIEVE_PROGRESS_SECS` | 5 | progress lines; at the old cadence the a(10) log reached 11 MB on a single line |
+
+Because a crash replays up to one checkpoint interval, `<statefile>.terms` can
+re-append terms it had already recorded: `sort -u` it before use.
 
 **Do not use the log to decide a run finished.** It is opened append and
 survives restarts, so one crash leaves a completion marker in it forever. Ask

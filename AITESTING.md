@@ -22,7 +22,7 @@ builds, which is what actually runs:
 ## Running the tests
 
     make check     # the eight known terms below 3e8; asserts, exits non-zero on failure
-    make test      # the full suite (tests/run-tests.sh), ~1 minute
+    make test      # the full suite (tests/run-tests.sh), ~2 minutes
     make bench     # v2 baseline vs current, ~1 minute on 32 cores
 
 `T=` sets the thread count for all three, e.g. `make test T=16`. The suite
@@ -30,8 +30,7 @@ works in a `mktemp -d` directory and leaves nothing in the tree.
 
 ## What the suite covers
 
-`tests/run-tests.sh` — 22 cases. Every one is a defect that was live at
-commit `a486447`; `REVIEW.md` says what each one was.
+`tests/run-tests.sh` — 27 cases, each one a defect that was live before it.
 
 **Correctness**
 
@@ -59,6 +58,15 @@ asked the allocator for something absurd:
 - `hi <= lo`, `hi == lo`, window 0, block 0, block > 2^40
 - thread counts of 0 and -4, for both binaries
 - `oddpart` with M below the smallest odd part
+- a malformed `SIEVE_CHECKPOINT_SECS` warns and falls back
+
+**Checkpoint cadence** — the interval is a time budget, so every resume test
+above finishes inside one interval and only ever exercises the final save.
+These force the periodic path with `SIEVE_CHECKPOINT_SECS=0`:
+
+- a periodic checkpoint is actually written mid-run
+- a killed run leaves an incomplete but *valid* checkpoint, which then resumes
+  to completion
 
 **oddpart** — the odd parts of every term with `2^m - 3 < 2000`.
 
