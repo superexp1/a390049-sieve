@@ -401,7 +401,7 @@ int main(int argc, char** argv) {
                 for (uint64_t j = 0; j < blen; ++j) {
                     Rec& r = buf[j];
                     uint64_t sg = r.sigma, ps = r.psi, ph = r.phi, o = om[j];
-                    if (r.rest > 1) {           // rest is 1 or a single prime > root
+                    if (r.rest > 1) {           // rest is 1 or a single prime > sqrt(this window's hi), NOT > root
                         sg *= r.rest + 1; ps *= r.rest + 1; ph *= r.rest - 1; o++;
                     }
                     if (sg == ps + ph + o && base + j > 1)
