@@ -30,7 +30,7 @@ works in a `mktemp -d` directory and leaves nothing in the tree.
 
 ## What the suite covers
 
-`tests/run-tests.sh` — 27 cases, each one a defect that was live before it.
+`tests/run-tests.sh` — 29 cases, each one a defect that was live before it.
 
 **Correctness**
 
@@ -68,7 +68,11 @@ These force the periodic path with `SIEVE_CHECKPOINT_SECS=0`:
 - a killed run leaves an incomplete but *valid* checkpoint, which then resumes
   to completion
 
-**oddpart** — the odd parts of every term with `2^m - 3 < 2000`.
+**oddpart** — the odd parts of every term with `2^m - 3 < 2000`; agreement
+with `tests/oddpart-reference.py`, which derives each candidate from the
+mathematics alone (`X = (P + omega(k)) / (4P - 3Q - R)`) and shares no code
+with the C++; and the window boundaries, where the odd-only indexing
+(`m = (lo|1) + 2i`) is most likely to be wrong.
 
 ## Checking a long run
 

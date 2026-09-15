@@ -104,6 +104,22 @@ echo "== oddpart =="
 OP=$(./oddpart 2000 "$T" 2>/dev/null | awk '$1=="TERM"{print $2}' | sed 's/oddpart=//' | sort -n | tr '\n' ' ')
 eq "odd parts of the terms with 2^m-3 < 2000" "5 13 29 61 509 1021 " "$OP"
 
+OREF=$(python3 tests/oddpart-reference.py 200000 | sort)
+eq "agrees with tests/oddpart-reference.py over m < 2e5" "$OREF" \
+   "$(./oddpart 200000 "$T" 2>/dev/null | sort)"
+
+# The buffer holds only odd m, index i being (lo|1)+2i, so the window boundary
+# is where that indexing can go wrong. Checked against the reference, not
+# against a previous binary, so it stays meaningful.
+OB_OK=1; OB_MSG=""
+for M in 3 4 5 7 1048575 1048576 1048577; do
+  R=$(python3 tests/oddpart-reference.py "$M" | sort)
+  G=$(./oddpart "$M" "$T" 2>/dev/null | sort)
+  [ "$R" = "$G" ] || { OB_OK=0; OB_MSG="$OB_MSG M=$M;"; }
+done
+if [ $OB_OK = 1 ]; then ok "odd-only indexing correct across window boundaries"
+else bad "odd-only indexing correct across window boundaries" "$OB_MSG"; fi
+
 echo
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

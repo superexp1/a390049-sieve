@@ -11,6 +11,12 @@
 //
 // Odd m is enumerated over [0, M), i.e. m < M.
 //
+// The buffer holds only ODD values: index i is m = (lo|1) + 2i. Consecutive
+// odd multiples of an odd p differ by 2p, so they step by p in index space.
+// The previous version initialised and sieved every integer in the window and
+// then threw the even half away at the test, doing twice the necessary work in
+// twice the memory.
+//
 //   g++ -O3 -march=native -fopenmp -o oddpart src/oddpart.cpp
 //   ./oddpart <M> [threads]
 //
@@ -50,25 +56,29 @@ int main(int argc,char**argv){
 
     #pragma omp parallel num_threads(th)
     {
-      std::vector<Rec> buf(W); std::vector<uint8_t> om(W);
+      std::vector<Rec> buf(W/2+1); std::vector<uint8_t> om(W/2+1);
       #pragma omp for schedule(dynamic,1)
       for(uint64_t w=0;w<nwin;++w){
-        uint64_t lo=w*W, hi=(lo+W<M)?lo+W:M, n=hi-lo;
-        for(uint64_t i=0;i<n;++i){buf[i]=Rec{1,1,1,lo+i};om[i]=0;}
+        const uint64_t lo=w*W, hi=(lo+W<M)?lo+W:M;
+        const uint64_t lo1=lo|1;                  // first odd >= lo
+        if(lo1>=hi)continue;
+        const uint64_t nodd=(hi-lo1+1)/2;         // odd values in [lo,hi)
+        for(uint64_t i=0;i<nodd;++i){buf[i]=Rec{1,1,1,lo1+2*i};om[i]=0;}
         for(uint32_t p:pr){
           if((uint64_t)p*p>hi)break;
-          if(p==2)continue;                       // odd m only
-          uint64_t s=((lo+p-1)/p)*p; if(s<(uint64_t)p*1)s=p;
-          for(uint64_t i=(s>lo?s-lo:0);i<n;i+=p){
-            if((lo+i)==0)continue;
+          if(p==2)continue;                       // 2 has no odd multiples
+          uint64_t q=(lo1+p-1)/p; if((q&1)==0)++q;// first ODD multiplier of p
+          const uint64_t start=q*p;               // odd, and >= lo1 >= 1
+          if(start>=hi)continue;
+          for(uint64_t i=(start-lo1)/2;i<nodd;i+=p){
             Rec&r=buf[i]; uint64_t pw=p,S=1+p,pe1=1;
             r.rest/=p;
             while(r.rest%p==0){r.rest/=p;pw*=p;S+=pw;pe1*=p;}
             r.sigma*=S; r.phi*=pe1*(p-1); r.psi*=pe1*(p+1); om[i]++;
           }
         }
-        for(uint64_t i=0;i<n;++i){
-          uint64_t m=lo+i; if(m<3||!(m&1))continue;
+        for(uint64_t i=0;i<nodd;++i){
+          const uint64_t m=lo1+2*i; if(m<3)continue;
           Rec&r=buf[i]; uint64_t P=r.sigma,Q=r.psi,R=r.phi; uint32_t o=om[i];
           if(r.rest>1){P*=r.rest+1;Q*=r.rest+1;R*=r.rest-1;o++;}
           // odd k = m itself
