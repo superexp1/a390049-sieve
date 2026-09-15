@@ -401,7 +401,13 @@ int main(int argc, char** argv) {
                 for (uint64_t j = 0; j < blen; ++j) {
                     Rec& r = buf[j];
                     uint64_t sg = r.sigma, ps = r.psi, ph = r.phi, o = om[j];
-                    if (r.rest > 1) {           // rest is 1 or a single prime > sqrt(this window's hi), NOT > root
+                    // rest is 1 or a single prime. Both prime loops break at
+                    // p*p > hi, where hi is the WINDOW's bound, so every prime
+                    // up to sqrt(window hi) has been stripped; and rest < hi,
+                    // so sqrt(rest) < sqrt(window hi). rest therefore has no
+                    // factor up to its own root, which makes it prime. root
+                    // itself never enters the claim.
+                    if (r.rest > 1) {
                         sg *= r.rest + 1; ps *= r.rest + 1; ph *= r.rest - 1; o++;
                     }
                     if (sg == ps + ph + o && base + j > 1)
@@ -430,7 +436,8 @@ int main(int argc, char** argv) {
                 const double now = omp_get_wtime();
                 if (!state.empty() && now - last_ckpt >= ckpt_secs) {
                     if (!save_state(state, hdr, doneBits))
-                        fprintf(stderr, "\nwarning: could not write checkpoint %s\n", state.c_str());
+                        fprintf(stderr, "\nwarning: could not write checkpoint %s\n",
+                                state.c_str());
                     last_ckpt = omp_get_wtime();       // measure from completion
                 }
                 if (now - last_prog >= prog_secs) {
