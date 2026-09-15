@@ -30,7 +30,7 @@ works in a `mktemp -d` directory and leaves nothing in the tree.
 
 ## What the suite covers
 
-`tests/run-tests.sh` — 29 cases, each one a defect that was live before it.
+`tests/run-tests.sh` — 30 cases, each one a defect that was live before it.
 
 **Correctness**
 
@@ -72,7 +72,9 @@ These force the periodic path with `SIEVE_CHECKPOINT_SECS=0`:
 with `tests/oddpart-reference.py`, which derives each candidate from the
 mathematics alone (`X = (P + omega(k)) / (4P - 3Q - R)`) and shares no code
 with the C++; and the window boundaries, where the odd-only indexing
-(`m = (lo|1) + 2i`) is most likely to be wrong.
+(`m = (lo|1) + 2i`) is most likely to be wrong; and invariance of the term
+list across 28 window x block combinations, since blocking carries a rolling
+offset per prime from one block to the next.
 
 ## Checking a long run
 

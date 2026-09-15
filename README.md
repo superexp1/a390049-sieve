@@ -74,7 +74,7 @@ the sieve root. Worth a further 1.42x.
     make test                 # full regression suite; see AITESTING.md
 
     ./sieve <lo> <hi> [threads] [window] [statefile] [block]
-    ./oddpart <M> [threads]
+    ./oddpart <M> [threads] [window] [block]
 
 Defaults are window 2^20 and block 8192 (256 KB, half the 512 KB L2 of the
 machine above); both were swept, and block is flat from 8K to 32K *on that

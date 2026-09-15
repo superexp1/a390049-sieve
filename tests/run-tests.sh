@@ -120,6 +120,18 @@ done
 if [ $OB_OK = 1 ]; then ok "odd-only indexing correct across window boundaries"
 else bad "odd-only indexing correct across window boundaries" "$OB_MSG"; fi
 
+# oddpart now blocks the window, carrying a rolling offset per prime across
+# blocks. That offset is the thing most likely to break, so the term list has
+# to be invariant to both knobs -- including block > window and block == 1.
+OW_EXP=$(./oddpart 1000003 "$T" 1048576 4096 2>/dev/null | sort)
+OW_OK=1; OW_MSG=""
+for W in 4096 65536 1048576 4194304; do for B in 1 7 64 1024 4096 65536 1048576; do
+  [ "$(./oddpart 1000003 "$T" "$W" "$B" 2>/dev/null | sort)" = "$OW_EXP" ] \
+    || { OW_OK=0; OW_MSG="$OW_MSG W=$W,B=$B;"; }
+done; done
+if [ $OW_OK = 1 ]; then ok "28 oddpart window x block combinations agree"
+else bad "28 oddpart window x block combinations agree" "$OW_MSG"; fi
+
 echo
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
