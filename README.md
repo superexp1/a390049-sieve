@@ -22,7 +22,7 @@ prime.
     a(10) = 17592173461504 = 2^22 (2^22 - 3)
     a(11) = 281474926379008 = 2^24(2^24 - 3)
 
-and, by exhausting every integer below 17592173461504, that these are
+and, by exhausting every integer below 281474926379008, that these are
 consecutive — nothing lies between them, and nothing else lies below.
 
 The sieve was validated by recovering the eight previously known terms, and
