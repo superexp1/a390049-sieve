@@ -20,6 +20,7 @@ prime.
 
     a(9)  = 1099508482048  = 2^20 (2^20 - 3)
     a(10) = 17592173461504 = 2^22 (2^22 - 3)
+    a(11) = 281474926379008 = 2^24(2^24 - 3)
 
 and, by exhausting every integer below 17592173461504, that these are
 consecutive — nothing lies between them, and nothing else lies below.
@@ -148,8 +149,7 @@ by a positive control: the same machinery run over *all* odd parts recovers all
 nine then-known terms from odd parts below 1.1e6, with no size search, and
 independently produced 2^22-3, 2^24-3 and 2^29-3.
 
-What is **not** claimed: that 2^24(2^24 - 3) and 2^29(2^29 - 3) are a(11) and
-a(12). They are terms, but nothing has tested the range below them.
+What is **not** claimed: 2^29(2^29 - 3) is a(12), the range below it has not been tested.
 
 ## License
 
